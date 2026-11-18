@@ -1,5 +1,7 @@
 #!/usr/bin/env pybricks-micropython
 
+## ESTE ES EL DEFINITIVO
+
 # LAB 3 - BUG 2 CON M-LINE "GRUESA" (BANDA)
 # Seguimiento de pared reciclado de main3.py (wall following con sonar a la izquierda)
 #
@@ -29,7 +31,7 @@ gyro = GyroSensor(Port.S2)
 # ---------------------------------------------------------------
 # CONSTANTES (mm, deg/s, ms)
 # ---------------------------------------------------------------
-WHEEL_DIAMETER = 45     # mm -> CALIBRAR
+WHEEL_DIAMETER = 49     # mm -> CALIBRAR
 SPEED = 350               # velocidad de seguimiento de pared (la de main3, funciona)
 GOAL_SPEED = 300          # velocidad en tramo libre hacia el objetivo (~145 mm/s)
 MIN_DIST = 100            # rango de seguimiento de pared (igual que main3)
@@ -58,6 +60,13 @@ MAX_WALL = 7000           # si rodea mas de 7 m sin salir -> va directo al objet
 ML_LEN = math.sqrt((GOAL_X - START_X) ** 2 + (GOAL_Y - START_Y) ** 2)
 UX = (GOAL_X - START_X) / ML_LEN
 UY = (GOAL_Y - START_Y) / ML_LEN
+
+# Correccion del objetivo segun cuantas veces abandona la pared sobre la m-line.
+# La m-line (UX, UY) ya esta calculada con el objetivo real y NO cambia;
+# solo se mueve el punto al que apunta el robot.
+GOAL_REAL = 2500.0
+GOAL_OFFSETS = [-250, 0, 250]   # 0 cruces -> 2250 | 1 cruce -> 2500 | 2 o mas -> 2750
+mline_count = 0
 
 # Pose (variables globales)
 x = START_X
@@ -129,6 +138,12 @@ def dist_to_goal():
 
 def at_goal():
     return dist_to_goal() < GOAL_RADIUS
+
+def set_goal():
+    global GOAL_X, GOAL_Y
+    i = min(mline_count, len(GOAL_OFFSETS) - 1)
+    GOAL_X = GOAL_REAL + GOAL_OFFSETS[i]
+    GOAL_Y = GOAL_REAL + GOAL_OFFSETS[i]
 
 def time_up():
     return timer.time() > TIME_LIMIT
@@ -262,6 +277,8 @@ prev_right = 0
 x = START_X
 y = START_Y
 timer = StopWatch()
+mline_count = 0
+set_goal()                                # 0 cruces -> objetivo (2250, 2250)
 
 result = 'go'
 while True:
@@ -269,6 +286,9 @@ while True:
     if result == 'bump':
         ev3.speaker.beep(800, 100)       # pitido corto: choque
         result = follow_wall()
+        if result == 'leave':
+            mline_count += 1              # ha detectado la m-line y sale de la pared
+            set_goal()
         if result == 'leave' or result == 'giveup':
             continue                      # vuelve a ir hacia el objetivo
     break                                 # 'goal' o 'time'
